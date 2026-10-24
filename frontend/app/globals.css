@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --color-paper: #eef1f5;
+  --color-panel: #ffffff;
+  --color-ink: #1c2430;
+  --color-muted: #6b7686;
+  --color-line: #d9dfe7;
+  --color-accent: #2f4bd8;
+  --color-accent-soft: #e3e8fb;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
