@@ -4,7 +4,7 @@ Gemma Chat is a private, local-first chat application built around a locally hos
 
 ## Project overview
 
-This project is designed to feel like a small, secure internal AI assistant app rather than a public SaaS product. It is centered around these features:
+This project is designed to feel like a small, secure internal AI assistant app. It is centered around these features:
 
 - Local model inference through Ollama with a configurable model, context length, and runtime settings.
 - Per-user chat conversations stored in SQLite, with each message tied to the authenticated user and a conversation title auto-generated from the first prompt.
