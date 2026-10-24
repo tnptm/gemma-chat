@@ -3,6 +3,7 @@
 import { KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, request, type Conversation, type ConversationDetail, type Message } from "@/lib/api";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 export default function Home() {
   const router = useRouter();
@@ -17,12 +18,25 @@ export default function Home() {
   const bottom = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
 
+  // State to hold user info
+  const [userName, setUserName] = useState<string>("User");
+
   const loadConvs = useCallback(async () => setConvs(await api<Conversation[]>("/conversations")), []);
 
   useEffect(() => {
     (async () => {
       const me = await request("/auth/me");
       if (!me.ok) return router.replace("/login");
+
+      // Read the JSON body from the response
+      const userData = await me.json();
+
+      if (userData && userData.username) {
+        setUserName(userData.username);
+      } else {
+        setUserName("Guest");
+      }
+
       await loadConvs();
       setReady(true);
     })();
@@ -114,6 +128,11 @@ export default function Home() {
 
       <aside className={`fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-line bg-panel transition-transform md:static md:translate-x-0 ${menu ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="p-3">
+          <h2 className="text-2xl">Gemma4:e2b Chat</h2>
+
+        </div>
+
+        <div className="p-3">
           <button onClick={newChat} className="w-full rounded-md bg-accent px-3 py-2.5 text-sm font-medium text-white">
             New chat
           </button>
@@ -133,6 +152,7 @@ export default function Home() {
           ))}
         </nav>
         <div className="border-t border-line p-3">
+          <p>Logged in: <span className="font-semibold" >{ userName }</span></p>
           <button onClick={logout} className="text-sm text-muted hover:text-ink">Sign out</button>
         </div>
       </aside>
@@ -150,13 +170,20 @@ export default function Home() {
             )}
             {messages.map((m) =>
               m.role === "user" ? (
-                <div key={m.id} className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-accent-soft px-4 py-2.5">
-                  {m.content}
+                <div key={m.id} className="ml-auto w-fit max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-accent-soft px-4 py-2.5 border border-t-cyan-800">
+                  {//<MarkdownRenderer markdown={m.content} />
+                  }
+                  { m.content}
                 </div>
               ) : (
-                <div key={m.id} className="max-w-full whitespace-pre-wrap break-words leading-relaxed">
-                  {m.content || <span className="text-muted">Thinking…</span>}
-                </div>
+                  <div key={m.id} className="max-w-full whitespace-pre-wrap break-words leading-relaxed">
+
+                    {
+                      m.content.length > 0 ?
+                      <MarkdownRenderer markdown={m.content} /> :
+                      <span className="text-muted">Thinking…</span>
+                    }
+                  </div>
               ),
             )}
             {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
