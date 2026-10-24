@@ -90,4 +90,5 @@ class LogoutView(_Public):
 
 class MeView(APIView):
     def get(self, request):
-        return Response({"username": request.user.get_username()})
+        return Response({"username": request.user.get_username(),
+                        "is_admin": bool(request.user.is_staff)})

@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt.token_blacklist",
     "accounts",
     "chat",
+    "control",
 ]
 
 MIDDLEWARE = [
@@ -89,7 +90,7 @@ REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": ["rest_framework.renderers.JSONRenderer"],
     "DEFAULT_PARSER_CLASSES": ["rest_framework.parsers.JSONParser"],
     "DEFAULT_THROTTLE_CLASSES": ["rest_framework.throttling.ScopedRateThrottle"],
-    "DEFAULT_THROTTLE_RATES": {"login": "5/min", "chat": "30/min"},
+    "DEFAULT_THROTTLE_RATES": {"login": "5/min", "chat": "30/min", "admin":"30/min"},
 }
 
 # --- CSRF / transport hardening ---
@@ -104,6 +105,7 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
 # --- Ollama ---
+OLLAMA_BIN = os.environ.get("OLLAMA_BIN", "ollama")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4")
 CHAT_SYSTEM_PROMPT = os.environ.get("CHAT_SYSTEM_PROMPT", "You are a helpful assistant.")

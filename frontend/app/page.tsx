@@ -1,6 +1,7 @@
 "use client";
 
 import { KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api, request, type Conversation, type ConversationDetail, type Message } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
@@ -18,8 +19,10 @@ export default function Home() {
   const bottom = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
 
+
   // State to hold user info
   const [userName, setUserName] = useState<string>("User");
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadConvs = useCallback(async () => setConvs(await api<Conversation[]>("/conversations")), []);
 
@@ -33,6 +36,7 @@ export default function Home() {
 
       if (userData && userData.username) {
         setUserName(userData.username);
+        setIsAdmin(userData.is_admin === true);
       } else {
         setUserName("Guest");
       }
@@ -152,8 +156,9 @@ export default function Home() {
           ))}
         </nav>
         <div className="border-t border-line p-3">
-          <p>Logged in: <span className="font-semibold" >{ userName }</span></p>
-          <button onClick={logout} className="text-sm text-muted hover:text-ink">Sign out</button>
+          <p>Logged in: <span className="font-semibold" >{ userName }</span>
+            <button onClick={logout} className="p-3 text-sm text-muted hover:text-ink underline"> Sign out</button></p>
+          <p className="my-2">{isAdmin && <Link href="/admin" className="text-sm text-accent hover:underline">Ollama dashboard</Link>}</p>
         </div>
       </aside>
 
