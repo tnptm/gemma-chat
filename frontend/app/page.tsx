@@ -158,12 +158,13 @@ export default function Home() {
         <div className="border-t border-line p-3">
           <p>Logged in: <span className="font-semibold" >{ userName }</span>
             <button onClick={logout} className="p-3 text-sm text-muted hover:text-ink underline"> Sign out</button></p>
-          <div className="p-3">
-            <ul>
-              <li className="list-disc">{isAdmin && <Link href="/admin" className="text-sm text-accent hover:underline">Ollama dashboard</Link>}</li>
-              <li className="list-disc">ToDO user admin</li>
-            </ul>
-          </div>
+          {isAdmin && (
+            <div className="p-3">
+              <ul>
+                <li className="list-disc"> <Link href="/admin" className="text-sm text-accent hover:underline">Ollama dashboard</Link></li>
+                <li className="list-disc">ToDO user admin</li>
+              </ul>
+            </div>)}
         </div>
       </aside>
 
