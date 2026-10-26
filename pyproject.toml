@@ -1,19 +1,23 @@
 [project]
 name = "gemma-chat"
 version = "0.1.0"
-description = "Add your description here"
+description = "Private, local-first chat app for a locally hosted Gemma model (Django + Next.js)"
 readme = "README.md"
 authors = [
     { name = "Toni Patama", email = "tonipat047@gmail.com" }
 ]
 requires-python = ">=3.15"
 dependencies = [
+    "Django>=5.2,<7.0",
+    "djangorestframework>=3.15",
+    "djangorestframework-simplejwt>=5.5",
+    "argon2-cffi>=23.1",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+    "gunicorn>=22.0",
     "psutil>=7.2.2",
 ]
 
-[project.scripts]
-gemma-chat = "gemma_chat:main"
-
-[build-system]
-requires = ["uv_build>=0.13.0,<0.14.0"]
-build-backend = "uv_build"
+[tool.uv]
+# Application, not a library: install dependencies only, don't build/install the project.
+package = false

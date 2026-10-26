@@ -24,13 +24,15 @@ In short, the application gives you a private, controlled chat workspace with mo
     # if the tag differs, set OLLAMA_MODEL in backend/.env
 
 ## 2. Backend
+Python dependencies are managed with [uv](https://docs.astral.sh/uv/) via the
+root `pyproject.toml` and `uv.lock` (add packages with `uv add <package>`).
+
+    uv sync                  # creates .venv in the repo root and installs locked deps
     cd backend
-    python -m venv .venv && source .venv/bin/activate
-    pip install -r requirements.txt
     cp .env.example .env     # set DJANGO_SECRET_KEY (see comment inside)
-    python manage.py migrate
-    python manage.py createsuperuser   # the only way to add a user: no public signup
-    python manage.py runserver 127.0.0.1:8000
+    uv run python manage.py migrate
+    uv run python manage.py createsuperuser   # the only way to add a user: no public signup
+    uv run python manage.py runserver 127.0.0.1:8000
 
 ## 3. Frontend
     cd frontend
@@ -50,5 +52,5 @@ In short, the application gives you a private, controlled chat workspace with mo
 ## Going beyond localhost
 - Serve over HTTPS (Caddy, or Tailscale/`tailscale serve`), then set in backend/.env:
   DJANGO_DEBUG=0, COOKIE_SECURE=1, DJANGO_ALLOWED_HOSTS and CSRF_TRUSTED_ORIGINS to your real host/origin.
-- Run Django with: gunicorn config.wsgi -k gthread --threads 8 -b 127.0.0.1:8000 --timeout 300
+- Run Django (from backend/) with: uv run gunicorn config.wsgi -k gthread --threads 8 -b 127.0.0.1:8000 --timeout 300
   and the frontend with: npm run build && npm start

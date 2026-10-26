@@ -27,7 +27,7 @@ Useful checks before sharing a change:
 
 ```sh
 cd backend
-python manage.py check
+uv run python manage.py check
 ```
 
 ```sh
