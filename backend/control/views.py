@@ -1,18 +1,10 @@
-from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import services
 from .models import OllamaConfig
 from .serializers import ConfigSerializer, ModelNameSerializer
-
-
-class IsAppAdmin(BasePermission):
-    """Server-side admin check: runs on every request, whatever the frontend shows."""
-
-    def has_permission(self, request, view):
-        u = request.user
-        return bool(u and u.is_authenticated and u.is_active and u.is_staff)
+from accounts.permissions import IsAppAdmin
 
 
 class AdminView(APIView):

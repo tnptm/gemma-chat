@@ -100,7 +100,10 @@ export default function AdminPage() {
     <main className="mx-auto max-w-3xl space-y-5 p-4 md:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Ollama dashboard</h1>
-        <Link href="/" className="text-sm text-accent hover:underline">Back to chat</Link>
+        <nav className="flex gap-4 text-sm">
+          <Link href="/admin/users" className="text-accent hover:underline">User management</Link>
+          <Link href="/" className="text-accent hover:underline">Back to chat</Link>
+        </nav>
       </header>
 
       {msg && <p role="status" className={`rounded-md border px-3 py-2 text-sm ${msg.ok ? "border-line bg-panel" : "border-red-300 bg-red-50 text-red-800"}`}>{msg.text}</p>}

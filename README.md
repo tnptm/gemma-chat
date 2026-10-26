@@ -12,6 +12,7 @@ This project is designed to feel like a small, secure internal AI assistant app.
 - Markdown rendering in the frontend, so assistant responses can include structured formatting, lists, headings, and code blocks in a readable layout.
 - Secure login and session handling using JWTs in secure, httpOnly cookies with CSRF protection and refresh-token rotation.
 - No public registration flow: the app is intended for a controlled environment where an admin creates accounts, and each API request is filtered by the currently logged-in user.
+- Admin-only user management for listing, creating, editing, and deleting accounts, including assigning administrator access.
 - Admin-only Ollama management dashboard for starting/stopping the local model runtime, checking installed models, loading/unloading models, and adjusting runtime configuration such as context length, concurrency, and keep-alive behavior.
 - Local-only deployment posture: the API is kept on loopback, the frontend uses app-side proxying, and access control is designed for private or trusted network use rather than open public access.
 - Built-in rate limiting and server-side protections around authentication and chat requests to help reduce abuse and accidental overuse.
