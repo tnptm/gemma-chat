@@ -11,6 +11,7 @@ type Config = {
 };
 type Status = {
   running: boolean; managed: boolean; pid: number | null; version: string | null; binary_found: boolean;
+  agent_ok: boolean; agent_error: string | null;
   installed: { name: string; size: number }[];
   loaded: { name: string; size: number; size_vram: number }[];
   config: Config;
@@ -57,7 +58,8 @@ export default function AdminPage() {
     if (!showLogs) return;
     const load = async () => {
       const r = await request("/admin/ollama/logs");
-      if (r.ok) setLogs((await r.json()).lines);
+      const j = await r.json().catch(() => ({}));
+      setLogs(r.ok ? j.lines : `[${errText(j)}]`);
     };
     load();
     const t = setInterval(load, 3000);
@@ -100,7 +102,10 @@ export default function AdminPage() {
     <main className="mx-auto max-w-3xl space-y-5 p-4 md:p-6">
       <header className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Ollama dashboard</h1>
-        <Link href="/" className="text-sm text-accent hover:underline">Back to chat</Link>
+        <nav className="flex gap-4 text-sm">
+          <Link href="/admin/users" className="text-accent hover:underline">User management</Link>
+          <Link href="/" className="text-accent hover:underline">Back to chat</Link>
+        </nav>
       </header>
 
       {msg && <p role="status" className={`rounded-md border px-3 py-2 text-sm ${msg.ok ? "border-line bg-panel" : "border-red-300 bg-red-50 text-red-800"}`}>{msg.text}</p>}
@@ -114,7 +119,7 @@ export default function AdminPage() {
           {status.version && <span className="text-sm text-muted">version {status.version}</span>}
           {status.managed && <span className="text-sm text-muted">started here (pid {status.pid})</span>}
           <div className="ml-auto flex gap-2">
-            <button className={btn} disabled={!!busy || status.running || !status.binary_found} onClick={() => act("Start", "/admin/ollama/start")}>
+            <button className={btn} disabled={!!busy || status.running || !status.agent_ok || !status.binary_found} onClick={() => act("Start", "/admin/ollama/start")}>
               {busy === "Start" ? "Starting…" : "Start"}
             </button>
             <button className={btn} disabled={!!busy || !status.managed} onClick={() => act("Restart", "/admin/ollama/restart")}>
@@ -125,9 +130,10 @@ export default function AdminPage() {
             </button>
           </div>
         </div>
-        {!status.binary_found && <p className="mt-3 text-sm text-red-800">The ollama executable was not found. Set OLLAMA_BIN in backend/.env.</p>}
-        {status.running && !status.managed && (
-          <p className="mt-3 text-sm text-muted">Ollama is running outside this dashboard (for example as a system service), so it cannot be stopped or restarted from here.</p>
+        {!status.agent_ok && <p className="mt-3 text-sm text-red-800">{status.agent_error ?? "The Ollama control agent is not available."}</p>}
+        {status.agent_ok && !status.binary_found && <p className="mt-3 text-sm text-red-800">The ollama executable was not found on the host. Set OLLAMA_BIN in ollama-agent/.env.</p>}
+        {status.agent_ok && status.running && !status.managed && (
+          <p className="mt-3 text-sm text-muted">Ollama is running but was not started by the control agent (for example a system service), so it cannot be stopped or restarted from here.</p>
         )}
       </section>
 

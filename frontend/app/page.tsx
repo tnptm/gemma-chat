@@ -162,7 +162,7 @@ export default function Home() {
             <div className="p-3">
               <ul>
                 <li className="list-disc"> <Link href="/admin" className="text-sm text-accent hover:underline">Ollama dashboard</Link></li>
-                <li className="list-disc">ToDO user admin</li>
+                <li className="list-disc"> <Link href="/admin/users" className="text-sm text-accent hover:underline">User management</Link></li>
               </ul>
             </div>)}
         </div>

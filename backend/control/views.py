@@ -1,18 +1,10 @@
-from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from . import services
 from .models import OllamaConfig
 from .serializers import ConfigSerializer, ModelNameSerializer
-
-
-class IsAppAdmin(BasePermission):
-    """Server-side admin check: runs on every request, whatever the frontend shows."""
-
-    def has_permission(self, request, view):
-        u = request.user
-        return bool(u and u.is_authenticated and u.is_active and u.is_staff)
+from accounts.permissions import IsAppAdmin
 
 
 class AdminView(APIView):
@@ -59,11 +51,7 @@ class StopView(AdminView):
 
 class RestartView(AdminView):
     def post(self, request):
-        def restart(cfg):
-            if services.managed_process():
-                services.stop(cfg)
-            services.start(cfg)
-        return self.run(restart)
+        return self.run(services.restart)
 
 
 class LoadView(AdminView):
@@ -82,4 +70,7 @@ class UnloadView(AdminView):
 
 class LogsView(AdminView):
     def get(self, request):
-        return Response({"lines": services.log_tail()})
+        try:
+            return Response({"lines": services.log_tail()})
+        except services.ServiceError as exc:
+            return Response({"detail": str(exc)}, status=409)

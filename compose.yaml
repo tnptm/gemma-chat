@@ -1,0 +1,30 @@
+# Ollama runs on the host (127.0.0.1:11434, with GPU access and pulled models).
+# Both services use host networking, so Django stays bound to loopback and
+# reaches Ollama exactly as it does outside Docker. Linux only.
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        UID: ${UID:-1000}
+        GID: ${GID:-1000}
+    network_mode: host
+    env_file: backend/.env
+    environment:
+      SQLITE_PATH: /app/data/db.sqlite3
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: frontend
+      args:
+        BACKEND_URL: http://127.0.0.1:8000
+    network_mode: host
+    environment:
+      PORT: 3000
+    depends_on:
+      - backend
+    restart: unless-stopped
