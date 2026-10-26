@@ -10,6 +10,7 @@ This project is designed to feel like a small, secure internal AI assistant app.
 - Per-user chat conversations stored in SQLite, with each message tied to the authenticated user and a conversation title auto-generated from the first prompt.
 - Streaming chat responses from the backend so the model output appears progressively in the browser instead of waiting for a full response.
 - Markdown rendering in the frontend, so assistant responses can include structured formatting, lists, headings, and code blocks in a readable layout.
+- Optional web search tool: when a question needs current or time-sensitive information, the model can search the web through a local SearXNG instance. It reads the relevant parts of the top pages and answers with a list of sources.
 - Secure login and session handling using JWTs in secure, httpOnly cookies with CSRF protection and refresh-token rotation.
 - No public registration flow: the app is intended for a controlled environment where an admin creates accounts, and each API request is filtered by the currently logged-in user.
 - Admin-only user management for listing, creating, editing, and deleting accounts, including assigning administrator access.
@@ -70,9 +71,31 @@ service with `sudo systemctl disable --now ollama.service`.
     npm install
     npm run dev              # http://localhost:3000
 
+## 5. Web search (optional)
+The model gets a `web_search` tool and decides itself when to use it: for news,
+prices, releases, schedules, or anything after its training data. The backend sends
+the query to [SearXNG](https://docs.searxng.org/), a self-hosted meta-search engine
+that runs from `compose.yaml` on 127.0.0.1:8888 with no API key. It then reads the top
+3 result pages, keeps the passages that match the query, and gives them to the model.
+Answers end with a **Sources** list.
+
+    docker compose up -d searxng
+    # in backend/.env:
+    WEB_SEARCH_ENABLED=1
+    SEARXNG_URL=http://127.0.0.1:8888
+
+- Off by default. When enabled, search queries go to public search engines (through
+  SearXNG) and result pages are fetched from the internet. Conversations themselves
+  are not sent anywhere.
+- Page fetching only reaches public addresses on ports 80/443. Loopback, LAN,
+  link-local and similar addresses are blocked when the connection is made, for
+  redirects too.
+- Search settings are in `searxng/settings.yml`. Up to 2 tool rounds per answer,
+  with up to 2 searches each.
+
 ## Alternative: Docker Compose (Linux)
-Runs Django (gunicorn) and Next.js (`next start`) in containers; Ollama keeps running
-on the host. Both containers use host networking, so Django stays on 127.0.0.1:8000
+Runs Django (gunicorn), Next.js (`next start`) and SearXNG in containers; Ollama keeps
+running on the host. Both containers use host networking, so Django stays on 127.0.0.1:8000
 and reaches Ollama at 127.0.0.1:11434. Images use the same versions as local
 development: Python 3.15.0 with packages from `uv.lock`, and Node 24.22.1 / npm 12.2.1
 with packages from `package-lock.json`.
@@ -101,6 +124,8 @@ with packages from `package-lock.json`.
 - No registration endpoint; every query is filtered by the logged-in user.
 - Next.js proxies /api/* to Django, so Django can stay bound to 127.0.0.1.
 - Messages are rendered as plain text (no HTML injection).
+- Web search: page fetches are restricted to public IPs (SSRF protection), and
+  search-derived text and links are escaped before they go into the Markdown answer.
 
 ## Going beyond localhost
 - Serve over HTTPS (Caddy, or Tailscale/`tailscale serve`), then set in backend/.env:

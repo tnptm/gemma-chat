@@ -10,6 +10,8 @@ These instructions apply to the entire repository.
 - `ollama-agent/` is a standalone, small Python service that runs on the
   host. It starts and stops `ollama serve`, and its API is loopback-only and
   protected by an API key. Django's `control` app calls it, as can other programs.
+- `searxng/` holds the settings for the local SearXNG search service used by the
+  chat's optional `web_search` tool (`backend/chat/websearch.py`).
 - `frontend/` contains the Next.js and React UI. Shared API helpers are in
   `frontend/lib/`, and reusable UI components are in `frontend/components/`.
 - The application is local-first: Ollama serves the model, Django stores

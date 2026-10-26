@@ -1,3 +1,5 @@
+import re
+
 from django.conf import settings
 from django.http import StreamingHttpResponse
 from rest_framework import viewsets
@@ -6,6 +8,17 @@ from rest_framework.decorators import action
 from . import ollama
 from .models import Conversation, Message
 from .serializers import ChatInputSerializer, ConversationDetailSerializer, ConversationSerializer
+
+
+def markdown_text(value):
+    """Plain text that can't open links, emphasis or HTML in the rendered Markdown."""
+    return re.sub(r"([\\`*_\[\]<>#|~])", r"\\\1", " ".join(value.split()))
+
+
+def format_sources(sources):
+    lines = [f"- [{markdown_text(title)[:120]}](<{url}>)" for title, url in sources
+             if url.startswith(("http://", "https://")) and not re.search(r"[\s<>]", url)]
+    return "\n\n**Sources**\n" + "\n".join(lines) if lines else ""
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -35,15 +48,22 @@ class ConversationViewSet(viewsets.ModelViewSet):
         conv.save()  # bumps updated_at
 
         recent = conv.messages.order_by("-created_at", "-id")[: settings.CHAT_HISTORY_LIMIT]
-        payload = [{"role": "system", "content": settings.CHAT_SYSTEM_PROMPT}]
+        payload = [{"role": "system", "content": ollama.system_prompt()}]
         payload += [{"role": m.role, "content": m.content} for m in reversed(list(recent))]
 
         def stream():
-            parts = []
+            parts = []  # what gets saved: the answer and its sources, not the progress lines
             try:
-                for piece in ollama.stream_chat(payload):
-                    parts.append(piece)
-                    yield piece
+                for kind, value in ollama.stream_chat(payload):
+                    if kind == "text":
+                        parts.append(value)
+                        yield value
+                    elif kind == "search":
+                        yield f"_Searching the web: {markdown_text(value)}…_\n\n"
+                    elif kind == "sources":
+                        block = format_sources(value)
+                        parts.append(block)
+                        yield block
             except ollama.OllamaError as exc:
                 yield f"\n\n[Error: {exc}]"
             finally:  # also runs if the client hits "stop"
