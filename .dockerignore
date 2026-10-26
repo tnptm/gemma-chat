@@ -1,0 +1,17 @@
+# Backend image build context is the repo root: only send what it needs.
+**/.env
+**/.env.*
+!**/.env.example
+**/*.sqlite3
+**/*.sqlite3-*
+**/__pycache__/
+backend/run/
+ollama-agent/
+data/
+.venv/
+.git/
+frontend/
+src/
+*.zip
+gemma-chat/
+webserver/

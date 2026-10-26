@@ -25,16 +25,39 @@ uv add <pkg>                              # add a backend dependency (updates uv
 
 cd backend
 uv run python manage.py check
-uv run python manage.py test              # all tests (currently accounts/tests.py)
+uv run python manage.py test              # all Django tests
 uv run python manage.py test accounts.tests.UserManagementTests.test_admin_can_delete_another_user
 uv run python manage.py makemigrations && uv run python manage.py migrate
 uv run python manage.py runserver 127.0.0.1:8000
+
+cd ..                                     # Ollama control agent (host only, not in Docker)
+uv run python ollama-agent/ollama_agent.py
+uv run python -m unittest discover -s ollama-agent
 
 cd frontend
 npm install
 npm run dev                               # http://localhost:3000
 npm run build                             # type-check + production build (no lint/test scripts)
+
+docker compose up -d --build              # from repo root: containerised backend + frontend
 ```
+
+**Docker:** `compose.yaml` runs `backend/Dockerfile` (built from the repo root so it gets
+`uv.lock`; runs migrate, then gunicorn on 127.0.0.1:8000) and `frontend/Dockerfile`
+(`next start` on :3000). Both use `network_mode: host` and talk to the **host** Ollama.
+The database is `./data/db.sqlite3`, bind-mounted at `/app/data` (`SQLITE_PATH`).
+Local `runserver` still uses `backend/db.sqlite3`. The base images are pinned to the
+local Python/Node/npm versions; when you upgrade locally, update the pins too.
+`BACKEND_URL` is a frontend **build** argument because Next resolves rewrites at build time.
+
+**Ollama control agent** (`ollama-agent/ollama_agent.py`): the only component that spawns
+or kills `ollama serve`. It uses only the standard library plus psutil and python-dotenv,
+and has its own `.env` (`OLLAMA_AGENT_API_KEY` ≥ 32 chars, `OLLAMA_AGENT_BIND` loopback-only,
+`OLLAMA_BIN`). The API is `GET /status`, `POST /start|/restart|/stop`, `GET /logs`, all with a
+Bearer key. State and logs are in `ollama-agent/run/`. It validates every setting itself
+because other programs may call it, and it strips `OLLAMA_*`/`DJANGO_*`/... from the child
+env so the key never reaches Ollama. It never kills a process it didn't start (pid + create
+time). Keep it loopback-only. Exposing it beyond that needs an explicit request and a security review.
 
 ## Cross-cutting conventions
 
@@ -55,5 +78,5 @@ npm run build                             # type-check + production build (no li
 
 ## Never commit
 
-`backend/.env`, `backend/db.sqlite3`, `backend/run/` (Ollama pid/log), `.venv/`,
+`backend/.env`, `backend/db.sqlite3`, `data/` (except `.gitkeep`), `backend/run/`, `ollama-agent/.env`, `ollama-agent/run/`, `.venv/`,
 `node_modules/`, `.next/`, and the `*.zip` archives in the repo root.

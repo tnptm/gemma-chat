@@ -3,6 +3,8 @@
 Run everything from `backend/` with `uv run` (see root CLAUDE.md for the command list).
 Settings are in `config/settings.py` and read `backend/.env` via python-dotenv. Use
 `.env.example` as the template, and add any new setting there with a comment.
+The database path comes from `SQLITE_PATH` (default `backend/db.sqlite3`; Docker uses
+`/app/data/db.sqlite3`).
 
 ## Layout
 
@@ -51,14 +53,18 @@ it uses `JSONRenderer` and `JSONParser` only.
 - `OllamaConfig` is a single-row model (always `pk=1`, use `OllamaConfig.load()`).
   Field validators restrict `host` to loopback-only, and also validate model names,
   `keep_alive` and absolute `models_dir`. Keep those validators.
-- `services.py` runs `ollama serve` with `subprocess.Popen` and a fixed env allowlist
-  from `cfg.env()`. It strips `DJANGO_`/`CSRF_`/`COOKIE_`/`CHAT_`/`OLLAMA_` vars from the
-  child env. The process is tracked in `run/ollama.pid` as `pid:create_time`, so a
-  recycled PID is never killed. Logs go to `run/ollama.log`.
+- Django does **not** spawn processes. Start, stop, restart and logs go to the host-side
+  control agent (`ollama-agent/`) through `services._agent()`, using `OLLAMA_AGENT_URL` and
+  `Authorization: Bearer OLLAMA_AGENT_API_KEY`. `cfg.server_settings()` is the request body.
+  The agent re-validates it, so keep both sides' validation in sync when adding a setting.
+- Status, the model list and load/unload still call Ollama's HTTP API directly at
+  `cfg.host`. `status()` merges in the agent's `managed`/`pid`/`binary_found` plus
+  `agent_ok`/`agent_error`, and the dashboard UI reads those fields.
 - Views subclass `AdminView`. Use `self.run(fn, ...)` so that `ServiceError` becomes a
   409 `{detail}` and the response returns the full status.
+- `control/tests.py` mocks `httpx.request` (agent) and `services._get` (Ollama).
 
 ## Tests
 
-The only tests are `accounts/tests.py` (`APITestCase`, `force_authenticate`). Add tests
+Tests are in `accounts/tests.py` and `control/tests.py` (`APITestCase`, `force_authenticate`). Add tests
 for new behaviour in the app's `tests.py`. Tests must not require a running Ollama.

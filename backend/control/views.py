@@ -51,11 +51,7 @@ class StopView(AdminView):
 
 class RestartView(AdminView):
     def post(self, request):
-        def restart(cfg):
-            if services.managed_process():
-                services.stop(cfg)
-            services.start(cfg)
-        return self.run(restart)
+        return self.run(services.restart)
 
 
 class LoadView(AdminView):
@@ -74,4 +70,7 @@ class UnloadView(AdminView):
 
 class LogsView(AdminView):
     def get(self, request):
-        return Response({"lines": services.log_tail()})
+        try:
+            return Response({"lines": services.log_tail()})
+        except services.ServiceError as exc:
+            return Response({"detail": str(exc)}, status=409)
