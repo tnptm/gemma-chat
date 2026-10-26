@@ -49,7 +49,7 @@ APPEND_SLASH = False
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": os.environ.get("SQLITE_PATH") or BASE_DIR / "db.sqlite3",
         "OPTIONS": {"timeout": 20},
     }
 }
@@ -105,7 +105,9 @@ if not DEBUG:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 
 # --- Ollama ---
-OLLAMA_BIN = os.environ.get("OLLAMA_BIN", "ollama")
+# Host-side control agent (ollama-agent/) that starts/stops the Ollama process
+OLLAMA_AGENT_URL = os.environ.get("OLLAMA_AGENT_URL", "http://127.0.0.1:11435").rstrip("/")
+OLLAMA_AGENT_API_KEY = os.environ.get("OLLAMA_AGENT_API_KEY", "")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
 OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4")
 CHAT_SYSTEM_PROMPT = os.environ.get("CHAT_SYSTEM_PROMPT", "You are a helpful assistant.")

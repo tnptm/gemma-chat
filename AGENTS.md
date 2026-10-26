@@ -7,6 +7,9 @@ These instructions apply to the entire repository.
 - `backend/` contains the Django REST API. Apps include `accounts/` for
   authentication, `chat/` for conversations and Ollama chat, and `control/`
   for the admin Ollama dashboard.
+- `ollama-agent/` is a standalone, small Python service that runs on the
+  host. It starts and stops `ollama serve`, and its API is loopback-only and
+  protected by an API key. Django's `control` app calls it, as can other programs.
 - `frontend/` contains the Next.js and React UI. Shared API helpers are in
   `frontend/lib/`, and reusable UI components are in `frontend/components/`.
 - The application is local-first: Ollama serves the model, Django stores

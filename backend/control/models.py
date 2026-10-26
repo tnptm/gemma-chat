@@ -44,16 +44,14 @@ class OllamaConfig(models.Model):
     def keep_alive_value(self):
         return int(self.keep_alive) if re.fullmatch(r"-?\d+", self.keep_alive) else self.keep_alive
 
-    def env(self):
-        """Environment variables for `ollama serve` (fixed allowlist, validated values)."""
-        env = {
-            "OLLAMA_HOST": self.host,
-            "OLLAMA_CONTEXT_LENGTH": str(self.context_length),
-            "OLLAMA_KEEP_ALIVE": self.keep_alive,
-            "OLLAMA_NUM_PARALLEL": str(self.num_parallel),
-            "OLLAMA_MAX_LOADED_MODELS": str(self.max_loaded_models),
-            "OLLAMA_FLASH_ATTENTION": "1" if self.flash_attention else "0",
+    def server_settings(self):
+        """Settings sent to the control agent for `ollama serve` (it validates them again)."""
+        return {
+            "host": self.host,
+            "context_length": self.context_length,
+            "keep_alive": self.keep_alive,
+            "num_parallel": self.num_parallel,
+            "max_loaded_models": self.max_loaded_models,
+            "flash_attention": self.flash_attention,
+            "models_dir": self.models_dir,
         }
-        if self.models_dir:
-            env["OLLAMA_MODELS"] = self.models_dir
-        return env

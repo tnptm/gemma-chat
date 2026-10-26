@@ -1,18 +1,5 @@
-import os
-import shutil
-import subprocess
-import time
-
 import httpx
-import psutil
 from django.conf import settings
-
-RUN_DIR = settings.BASE_DIR / "run"
-PID_FILE = RUN_DIR / "ollama.pid"
-LOG_FILE = RUN_DIR / "ollama.log"
-
-# Keep the app's own secrets out of the Ollama process
-_STRIP_PREFIXES = ("DJANGO_", "CSRF_", "COOKIE_", "CHAT_", "OLLAMA_")
 
 
 class ServiceError(Exception):
@@ -29,27 +16,37 @@ def _get(cfg, path, timeout=3):
     return r.json()
 
 
-def managed_process():
-    """The ollama process this dashboard started. The pid file also stores the process
-    start time, so a recycled PID that belongs to some other program is never touched."""
+# --- Control agent (ollama-agent/, runs on the host and owns the Ollama process) ---
+
+def _agent(method, path, timeout=5.0, **kwargs):
+    if not settings.OLLAMA_AGENT_API_KEY:
+        raise ServiceError("The Ollama control agent is not configured. Set OLLAMA_AGENT_API_KEY in backend/.env.")
     try:
-        pid, started = PID_FILE.read_text().split(":")
-        proc = psutil.Process(int(pid))
-        if proc.is_running() and proc.status() != psutil.STATUS_ZOMBIE and abs(proc.create_time() - float(started)) < 1:
-            return proc
-    except (OSError, ValueError, psutil.Error):
-        pass
-    PID_FILE.unlink(missing_ok=True)
-    return None
+        r = httpx.request(method, settings.OLLAMA_AGENT_URL + path, timeout=timeout,
+                          headers={"Authorization": f"Bearer {settings.OLLAMA_AGENT_API_KEY}"}, **kwargs)
+    except httpx.HTTPError as exc:
+        raise ServiceError("Cannot reach the Ollama control agent. Is ollama-agent running?") from exc
+    if r.status_code == 401:
+        raise ServiceError("The Ollama control agent rejected the API key.")
+    try:
+        data = r.json()
+    except ValueError:
+        data = {}
+    if r.status_code != 200:
+        raise ServiceError(data.get("detail") or f"Control agent returned HTTP {r.status_code}.")
+    return data
 
 
 def status(cfg):
-    proc = managed_process()
     info = {
-        "running": False, "managed": proc is not None, "pid": proc.pid if proc else None,
-        "version": None, "binary_found": shutil.which(settings.OLLAMA_BIN) is not None,
-        "installed": [], "loaded": [],
+        "running": False, "managed": False, "pid": None, "version": None, "binary_found": False,
+        "agent_ok": False, "agent_error": None, "installed": [], "loaded": [],
     }
+    try:
+        agent = _agent("GET", "/status", timeout=3.0)
+        info.update(agent_ok=True, managed=agent["managed"], pid=agent["pid"], binary_found=agent["binary_found"])
+    except (ServiceError, KeyError) as exc:
+        info["agent_error"] = str(exc) if isinstance(exc, ServiceError) else "Unexpected control agent response."
     try:
         info["version"] = _get(cfg, "/api/version")["version"]
         info["running"] = True
@@ -64,47 +61,15 @@ def status(cfg):
 
 
 def start(cfg):
-    if status(cfg)["running"]:
-        raise ServiceError("Ollama is already running.")
-    binary = shutil.which(settings.OLLAMA_BIN)
-    if not binary:
-        raise ServiceError(f"Executable '{settings.OLLAMA_BIN}' not found. Set OLLAMA_BIN in backend/.env.")
-    RUN_DIR.mkdir(exist_ok=True)
-    env = {k: v for k, v in os.environ.items() if not k.startswith(_STRIP_PREFIXES)}
-    env.update(cfg.env())
-    extra = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
-    with open(LOG_FILE, "ab") as log:
-        proc = subprocess.Popen([binary, "serve"], env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=log, **extra)
-    PID_FILE.write_text(f"{proc.pid}:{psutil.Process(proc.pid).create_time()}")
-    for _ in range(40):  # up to ~20 s
-        if status(cfg)["running"]:
-            return
-        if proc.poll() is not None:
-            PID_FILE.unlink(missing_ok=True)
-            raise ServiceError("Ollama exited right after starting. Check the log.")
-        time.sleep(0.5)
-    raise ServiceError("Ollama did not become ready in time. Check the log.")
+    _agent("POST", "/start", timeout=30.0, json=cfg.server_settings())
 
 
 def stop(cfg):
-    proc = managed_process()
-    if not proc:
-        if status(cfg)["running"]:
-            raise ServiceError("This Ollama was not started from the dashboard (e.g. a system service), so it can't be stopped here.")
-        raise ServiceError("Ollama is not running.")
-    tree = [proc] + proc.children(recursive=True)  # includes model runner processes
-    for p in tree:
-        try:
-            p.terminate()
-        except psutil.Error:
-            pass
-    _, alive = psutil.wait_procs(tree, timeout=10)
-    for p in alive:
-        try:
-            p.kill()
-        except psutil.Error:
-            pass
-    PID_FILE.unlink(missing_ok=True)
+    _agent("POST", "/stop", timeout=20.0)
+
+
+def restart(cfg):
+    _agent("POST", "/restart", timeout=45.0, json=cfg.server_settings())
 
 
 def set_loaded(cfg, model, load):
@@ -122,10 +87,4 @@ def set_loaded(cfg, model, load):
 
 
 def log_tail(lines=200):
-    try:
-        with open(LOG_FILE, "rb") as f:
-            f.seek(0, os.SEEK_END)
-            f.seek(max(0, f.tell() - 65536))
-            return "\n".join(f.read().decode("utf-8", "replace").splitlines()[-lines:])
-    except OSError:
-        return ""
+    return _agent("GET", "/logs", params={"lines": lines})["lines"]

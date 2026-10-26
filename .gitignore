@@ -3,3 +3,12 @@ gemma-chat/README.md
 gemma-chat/
 backend/run/ollama.log
 backend/run/ollama.pid
+
+# Docker volume data (SQLite database)
+data/*
+!data/.gitkeep
+
+# Ollama control agent secrets and runtime state
+ollama-agent/.env
+ollama-agent/run/
+**/__pycache__/
