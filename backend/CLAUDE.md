@@ -44,6 +44,19 @@ it uses `JSONRenderer` and `JSONParser` only.
 - The response is a `StreamingHttpResponse` of **plain text** chunks, not SSE/JSON.
   Ollama failures are added to the stream as `[Error: ...]` text. The assistant
   message is saved in `finally`, so a partial reply is kept when the client aborts.
+- `ollama.stream_chat()` is a tool loop that yields events: `("text", chunk)`,
+  `("search", query)` and `("sources", [(title, url)])`. The view streams a progress line
+  for each search, but saves only the answer text plus the **Sources** block. The
+  system prompt comes from `ollama.system_prompt()` and includes today's date.
+- **Web search** (`chat/websearch.py`, enabled by `WEB_SEARCH_ENABLED`): SearXNG JSON API
+  at `SEARXNG_URL`, then it fetches the top pages and keeps the passages that match the
+  query (`relevant_excerpt`). Output is capped by `RESULT_CHARS` so a small context window
+  doesn't overflow. Limits: `MAX_TOOL_ROUNDS`/`MAX_CALLS_PER_ROUND` in `ollama.py`.
+- Page fetching must go through `_page_client()`. Its httpcore backend refuses
+  non-public IPs at connect time (SSRF/DNS-rebinding protection). It replaces the
+  private `HTTPTransport._pool`, and `chat/tests.py` checks that this still works after
+  httpx upgrades. Any model- or web-derived text placed into the Markdown answer must
+  go through `markdown_text()`/`format_sources()`.
 - Chat uses `settings.OLLAMA_URL` and `settings.OLLAMA_MODEL` from `.env`. It does
   **not** use the dashboard's `OllamaConfig.host`/`active_model`. Keep that in mind
   if you change which model chat uses.
@@ -66,5 +79,5 @@ it uses `JSONRenderer` and `JSONParser` only.
 
 ## Tests
 
-Tests are in `accounts/tests.py` and `control/tests.py` (`APITestCase`, `force_authenticate`). Add tests
-for new behaviour in the app's `tests.py`. Tests must not require a running Ollama.
+Tests are in `accounts/tests.py`, `chat/tests.py` and `control/tests.py` (`APITestCase`, `force_authenticate`). Add tests
+for new behaviour in the app's `tests.py`. Tests must not require a running Ollama, SearXNG or internet access.

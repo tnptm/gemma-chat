@@ -17,6 +17,21 @@ services:
       - ./data:/app/data
     restart: unless-stopped
 
+  # Meta-search engine for the chat's web_search tool (JSON API on 127.0.0.1:8888)
+  searxng:
+    image: searxng/searxng:2026.10.25-54ca1d9cf
+    network_mode: host
+    user: "977:977"   # image's searxng user; never chowns the bind-mounted settings
+    environment:
+      GRANIAN_HOST: 127.0.0.1
+      GRANIAN_PORT: "8888"
+      FORCE_OWNERSHIP: "false"
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    # Fresh random secret on every start; nothing persistent depends on it
+    entrypoint: ["/bin/sh", "-c", "export SEARXNG_SECRET=$$(head -c 32 /dev/urandom | base64 | tr -dc A-Za-z0-9); exec /usr/local/searxng/entrypoint.sh"]
+    restart: unless-stopped
+
   frontend:
     build:
       context: frontend
