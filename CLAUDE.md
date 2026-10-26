@@ -10,7 +10,8 @@ Directory-specific notes: `backend/CLAUDE.md` and `frontend/CLAUDE.md`.
 
 Gemma Chat: a private, local-first chat app. Browser → Next.js (`frontend/`, port 3000)
 → rewrites `/api/*` → Django REST API (`backend/`, `127.0.0.1:8000`) → local Ollama
-(`127.0.0.1:11434`). SQLite stores users and conversations. There is no public signup;
+(`127.0.0.1:11434`). With `WEB_SEARCH_ENABLED=1`, the model can call a `web_search`
+tool backed by SearXNG (compose service, `127.0.0.1:8888`). SQLite stores users and conversations. There is no public signup;
 users are created by `createsuperuser` or by an admin in the UI.
 
 ## Commands
