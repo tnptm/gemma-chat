@@ -1,8 +1,11 @@
+import itertools
 import json
 
 import httpx
 from django.conf import settings
 from django.utils import timezone
+
+from control.services import base_url
 
 from . import websearch
 
@@ -42,14 +45,18 @@ def system_prompt():
     return prompt
 
 
-def _stream(body):
+def _stream(cfg, body):
     """Yield parsed chunks from Ollama's streaming /api/chat."""
     try:
-        with httpx.stream("POST", f"{settings.OLLAMA_URL}/api/chat", json=body,
+        with httpx.stream("POST", f"{base_url(cfg)}/api/chat", json=body,
                           timeout=httpx.Timeout(10.0, read=300.0)) as r:
             if r.status_code != 200:
                 r.read()
-                raise OllamaError(f"Ollama returned HTTP {r.status_code} (is model '{settings.OLLAMA_MODEL}' pulled?)")
+                try:
+                    detail = str(r.json().get("error") or "")[:300]
+                except ValueError:
+                    detail = ""
+                raise OllamaError(detail or f"Ollama returned HTTP {r.status_code} for model '{body['model']}'.")
             for line in r.iter_lines():
                 if not line:
                     continue
@@ -78,18 +85,33 @@ def _run_tool(call):
     return query, *websearch.web_search(query)
 
 
-def stream_chat(messages):
-    """Yield ("text", chunk) for the answer, ("search", query) when a web search starts and
+def stream_chat(messages, cfg):
+    """Chat with the model selected in the dashboard (`cfg` is the OllamaConfig).
+
+    Yield ("text", chunk) for the answer, ("search", query) when a web search starts and
     ("sources", [(title, url), ...]) at the end if search results were used."""
+    if not cfg.active_model:
+        raise OllamaError("No chat model is selected. An admin can choose one in the Ollama dashboard.")
     messages = list(messages)
     sources = []
     tools = [WEB_SEARCH_TOOL] if settings.WEB_SEARCH_ENABLED else None
     for turn in range(MAX_TOOL_ROUNDS + 1):
-        body = {"model": settings.OLLAMA_MODEL, "messages": messages, "stream": True}
+        body = {"model": cfg.active_model, "messages": messages, "stream": True,
+                "keep_alive": cfg.keep_alive_value(), "options": {"num_ctx": cfg.context_length}}
         if tools and turn < MAX_TOOL_ROUNDS:
             body["tools"] = tools
         text, calls = [], []
-        for data in _stream(body):
+        try:
+            chunks = _stream(cfg, body)
+            first = next(chunks, None)  # HTTP errors surface here, before any output
+        except OllamaError as exc:
+            if "tools" not in body or "does not support tools" not in str(exc):
+                raise
+            tools = None  # the selected model can't call tools: answer without web search
+            del body["tools"]
+            chunks = _stream(cfg, body)
+            first = next(chunks, None)
+        for data in itertools.chain([first] if first else [], chunks):
             message = data.get("message", {})
             piece = message.get("content", "")
             if piece:

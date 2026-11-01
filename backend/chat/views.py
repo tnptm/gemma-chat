@@ -4,6 +4,10 @@ from django.conf import settings
 from django.http import StreamingHttpResponse
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+from control.models import OllamaConfig
 
 from . import ollama
 from .models import Conversation, Message
@@ -19,6 +23,13 @@ def format_sources(sources):
     lines = [f"- [{markdown_text(title)[:120]}](<{url}>)" for title, url in sources
              if url.startswith(("http://", "https://")) and not re.search(r"[\s<>]", url)]
     return "\n\n**Sources**\n" + "\n".join(lines) if lines else ""
+
+
+class ChatModelView(APIView):
+    """The model chat currently uses (selected in the admin dashboard), for the chat UI."""
+
+    def get(self, request):
+        return Response({"model": OllamaConfig.load().active_model or None})
 
 
 class ConversationViewSet(viewsets.ModelViewSet):
@@ -41,6 +52,10 @@ class ConversationViewSet(viewsets.ModelViewSet):
         ser = ChatInputSerializer(data=request.data)
         ser.is_valid(raise_exception=True)
         content = ser.validated_data["content"].strip()
+        cfg = OllamaConfig.load()  # model, host and context length come from the dashboard
+        if not cfg.active_model:
+            return Response({"detail": "No chat model is selected. An admin can choose one in the Ollama dashboard."},
+                            status=409)
 
         Message.objects.create(conversation=conv, role=Message.Role.USER, content=content)
         if conv.title == "New chat":
@@ -54,7 +69,7 @@ class ConversationViewSet(viewsets.ModelViewSet):
         def stream():
             parts = []  # what gets saved: the answer and its sources, not the progress lines
             try:
-                for kind, value in ollama.stream_chat(payload):
+                for kind, value in ollama.stream_chat(payload, cfg):
                     if kind == "text":
                         parts.append(value)
                         yield value

@@ -108,8 +108,7 @@ if not DEBUG:
 # Host-side control agent (ollama-agent/) that starts/stops the Ollama process
 OLLAMA_AGENT_URL = os.environ.get("OLLAMA_AGENT_URL", "http://127.0.0.1:11435").rstrip("/")
 OLLAMA_AGENT_API_KEY = os.environ.get("OLLAMA_AGENT_API_KEY", "")
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434").rstrip("/")
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma4")
+# The chat model, Ollama host and context length are set in the admin dashboard (control.OllamaConfig)
 CHAT_SYSTEM_PROMPT = os.environ.get("CHAT_SYSTEM_PROMPT", "You are a helpful assistant.")
 CHAT_HISTORY_LIMIT = int(os.environ.get("CHAT_HISTORY_LIMIT", "40"))
 

@@ -1,6 +1,7 @@
 export type Conversation = { id: string; title: string; created_at: string; updated_at: string };
 export type Message = { id: string | number; role: "user" | "assistant"; content: string };
 export type ConversationDetail = Conversation & { messages: Message[] };
+export type ChatModel = { model: string | null };
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {

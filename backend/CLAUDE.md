@@ -57,9 +57,14 @@ it uses `JSONRenderer` and `JSONParser` only.
   private `HTTPTransport._pool`, and `chat/tests.py` checks that this still works after
   httpx upgrades. Any model- or web-derived text placed into the Markdown answer must
   go through `markdown_text()`/`format_sources()`.
-- Chat uses `settings.OLLAMA_URL` and `settings.OLLAMA_MODEL` from `.env`. It does
-  **not** use the dashboard's `OllamaConfig.host`/`active_model`. Keep that in mind
-  if you change which model chat uses.
+- Chat uses the dashboard's `OllamaConfig` (loaded once per request in the view and
+  passed to `stream_chat(messages, cfg)`): `active_model` as the model, `host` as the
+  Ollama URL (`control.services.base_url`), `context_length` as `options.num_ctx`, and
+  `keep_alive`. There is **no** model or Ollama URL in settings/`.env`; don't hardcode
+  model names. With no model selected, the chat endpoint returns 409 before saving the
+  message. If the model rejects tools ("does not support tools"), the loop retries
+  without `web_search`. `GET /api/chat/model` exposes the selected model to any
+  logged-in user.
 
 ## Ollama control (`control/`)
 
