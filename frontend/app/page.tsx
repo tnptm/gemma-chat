@@ -3,7 +3,7 @@
 import { KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { api, request, type Conversation, type ConversationDetail, type Message } from "@/lib/api";
+import { api, request, type ChatModel, type Conversation, type ConversationDetail, type Message } from "@/lib/api";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 export default function Home() {
@@ -23,8 +23,11 @@ export default function Home() {
   // State to hold user info
   const [userName, setUserName] = useState<string>("User");
   const [isAdmin, setIsAdmin] = useState(false);
+  // Chat model selected in the admin dashboard
+  const [model, setModel] = useState<string | null>(null);
 
   const loadConvs = useCallback(async () => setConvs(await api<Conversation[]>("/conversations")), []);
+  const loadModel = useCallback(async () => setModel((await api<ChatModel>("/chat/model")).model), []);
 
   useEffect(() => {
     (async () => {
@@ -41,10 +44,10 @@ export default function Home() {
         setUserName("Guest");
       }
 
-      await loadConvs();
+      await Promise.all([loadConvs(), loadModel()]);
       setReady(true);
     })();
-  }, [router, loadConvs]);
+  }, [router, loadConvs, loadModel]);
 
   useEffect(() => bottom.current?.scrollIntoView({ block: "end" }), [messages]);
 
@@ -99,7 +102,11 @@ export default function Home() {
         body: JSON.stringify({ content: text }),
         signal: ctrl.signal,
       });
-      if (!res.ok || !res.body) throw new Error(res.status === 429 ? "Slow down a little, then try again." : "The request failed.");
+      if (res.status === 429) throw new Error("Slow down a little, then try again.");
+      if (!res.ok || !res.body) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(typeof j.detail === "string" ? j.detail : "The request failed.");
+      }
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       for (;;) {
@@ -114,6 +121,7 @@ export default function Home() {
       setBusy(false);
       abort.current = null;
       loadConvs();
+      loadModel().catch(() => {});
     }
   }
 
@@ -132,8 +140,10 @@ export default function Home() {
 
       <aside className={`fixed inset-y-0 left-0 z-20 flex w-72 flex-col border-r border-line bg-panel transition-transform md:static md:translate-x-0 ${menu ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="p-3">
-          <h2 className="text-2xl">Gemma4:e2b Chat</h2>
-
+          <h2 className="text-2xl">Gemma Chat</h2>
+          <p className="truncate text-sm text-muted" title={model ?? undefined}>
+            Model: {model ?? "not selected"}
+          </p>
         </div>
 
         <div className="p-3">

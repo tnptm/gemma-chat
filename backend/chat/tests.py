@@ -6,6 +6,8 @@ from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, override_settings
 from rest_framework.test import APITestCase
 
+from control.models import OllamaConfig
+
 from . import ollama, websearch
 from .models import Conversation, Message
 from .views import format_sources, markdown_text
@@ -87,6 +89,9 @@ class WebSearchToolTests(SimpleTestCase):
         self.assertEqual(urls, ["https://a.example/", "https://b.example/"])
 
 
+CFG = OllamaConfig(active_model="picked:model", host="127.0.0.1:11434", context_length=4096, keep_alive="10m")
+
+
 def chunks(*messages):
     return [{"message": m, "done": False} for m in messages] + [{"message": {}, "done": True}]
 
@@ -97,13 +102,13 @@ class ToolLoopTests(SimpleTestCase):
         call = {"function": {"name": "web_search", "arguments": {"query": "python latest"}}}
         bodies = []
 
-        def fake_stream(body):
+        def fake_stream(cfg, body):
             bodies.append(body)
             return iter(chunks({"tool_calls": [call]}) if len(bodies) == 1 else chunks({"content": "It is 3.15.2."}))
 
         with mock.patch.object(ollama, "_stream", side_effect=fake_stream), \
                 mock.patch.object(websearch, "web_search", return_value=("RESULTS", [("T", "https://t.example/")])) as ws:
-            events = list(ollama.stream_chat([{"role": "user", "content": "latest python?"}]))
+            events = list(ollama.stream_chat([{"role": "user", "content": "latest python?"}], CFG))
         ws.assert_called_once_with("python latest")
         self.assertEqual(events, [("search", "python latest"), ("text", "It is 3.15.2."),
                                   ("sources", [("T", "https://t.example/")])])
@@ -115,13 +120,13 @@ class ToolLoopTests(SimpleTestCase):
         call = {"function": {"name": "web_search", "arguments": '{"query": "again"}'}}
         bodies = []
 
-        def fake_stream(body):
+        def fake_stream(cfg, body):
             bodies.append(body)
             return iter(chunks({"tool_calls": [call, call, call]}) if "tools" in body else chunks({"content": "done"}))
 
         with mock.patch.object(ollama, "_stream", side_effect=fake_stream), \
                 mock.patch.object(websearch, "web_search", return_value=("R", [])) as ws:
-            events = list(ollama.stream_chat([{"role": "user", "content": "q"}]))
+            events = list(ollama.stream_chat([{"role": "user", "content": "q"}], CFG))
         self.assertEqual(len(bodies), ollama.MAX_TOOL_ROUNDS + 1)
         self.assertNotIn("tools", bodies[-1])
         self.assertEqual(ws.call_count, ollama.MAX_TOOL_ROUNDS * ollama.MAX_CALLS_PER_ROUND)
@@ -130,9 +135,47 @@ class ToolLoopTests(SimpleTestCase):
     @override_settings(WEB_SEARCH_ENABLED=False)
     def test_disabled_search_sends_no_tools(self):
         with mock.patch.object(ollama, "_stream", return_value=iter(chunks({"content": "hi"}))) as stream:
-            self.assertEqual(list(ollama.stream_chat([])), [("text", "hi")])
-        self.assertNotIn("tools", stream.call_args.args[0])
+            self.assertEqual(list(ollama.stream_chat([], CFG)), [("text", "hi")])
+        self.assertNotIn("tools", stream.call_args.args[1])
         self.assertNotIn("web_search", ollama.system_prompt())
+
+    @override_settings(WEB_SEARCH_ENABLED=False)
+    def test_uses_dashboard_model_host_and_context(self):
+        cfg = OllamaConfig(active_model="qwen3.5:latest", host="localhost:11500", context_length=16384, keep_alive="-1")
+        with mock.patch.object(httpx, "stream") as stream:
+            stream.return_value.__enter__.return_value = httpx.Response(
+                200, content=b'{"message": {"content": "ok"}, "done": true}\n', request=httpx.Request("POST", "http://x"))
+            self.assertEqual(list(ollama.stream_chat([], cfg)), [("text", "ok")])
+        method, url = stream.call_args.args
+        self.assertEqual(url, "http://127.0.0.1:11500/api/chat")
+        body = stream.call_args.kwargs["json"]
+        self.assertEqual(body["model"], "qwen3.5:latest")
+        self.assertEqual(body["options"], {"num_ctx": 16384})
+        self.assertEqual(body["keep_alive"], -1)
+
+    def test_no_selected_model_is_an_error(self):
+        with self.assertRaisesRegex(ollama.OllamaError, "No chat model"):
+            list(ollama.stream_chat([], OllamaConfig(active_model="")))
+
+    @override_settings(WEB_SEARCH_ENABLED=True)
+    def test_model_without_tool_support_answers_without_search(self):
+        bodies = []
+
+        def fake_stream(cfg, body):
+            bodies.append(dict(body))
+            if "tools" in body:
+                raise ollama.OllamaError("registry.ollama.ai/library/old does not support tools")
+            return iter(chunks({"content": "plain answer"}))
+
+        with mock.patch.object(ollama, "_stream", side_effect=fake_stream):
+            events = list(ollama.stream_chat([{"role": "user", "content": "q"}], CFG))
+        self.assertEqual(events, [("text", "plain answer")])
+        self.assertEqual(["tools" in b for b in bodies], [True, False])
+
+    def test_other_ollama_errors_are_not_swallowed(self):
+        with mock.patch.object(ollama, "_stream", side_effect=ollama.OllamaError("model 'x' not found")):
+            with self.assertRaisesRegex(ollama.OllamaError, "not found"):
+                list(ollama.stream_chat([], CFG))
 
 
 class MarkdownOutputTests(SimpleTestCase):
@@ -152,12 +195,29 @@ class ChatEndpointTests(APITestCase):
         self.user = User.objects.create_user(username="u", password="some-password")
         self.client.force_authenticate(self.user)
         self.conv = Conversation.objects.create(user=self.user)
+        cfg = OllamaConfig.load()
+        cfg.active_model = "picked:model"
+        cfg.save()
+
+    def test_chat_model_endpoint_reports_dashboard_selection(self):
+        self.assertEqual(self.client.get("/api/chat/model").data, {"model": "picked:model"})
+        OllamaConfig.objects.update(active_model="")
+        self.assertEqual(self.client.get("/api/chat/model").data, {"model": None})
+        self.assertEqual(self.client_class().get("/api/chat/model").status_code, 401)
+
+    def test_chat_without_selected_model_is_rejected_before_saving(self):
+        OllamaConfig.objects.update(active_model="")
+        response = self.client.post(f"/api/conversations/{self.conv.pk}/chat", {"content": "hi"}, format="json")
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("No chat model", response.data["detail"])
+        self.assertFalse(Message.objects.filter(conversation=self.conv).exists())
 
     def test_stream_saves_answer_and_sources_but_not_progress(self):
         events = [("search", "q"), ("text", "Answer."), ("sources", [("T", "https://t.example/")])]
-        with mock.patch.object(ollama, "stream_chat", return_value=iter(events)):
+        with mock.patch.object(ollama, "stream_chat", return_value=iter(events)) as stream_chat:
             response = self.client.post(f"/api/conversations/{self.conv.pk}/chat", {"content": "hi"}, format="json")
             body = b"".join(response.streaming_content).decode()
+        self.assertEqual(stream_chat.call_args.args[1].active_model, "picked:model")
         self.assertIn("_Searching the web: q…_", body)
         saved = Message.objects.get(conversation=self.conv, role="assistant").content
         self.assertTrue(saved.startswith("Answer."))

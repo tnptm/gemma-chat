@@ -24,8 +24,14 @@ In short, the application gives you a private, controlled chat workspace with mo
 Pull models with the `ollama` CLI. This needs a running Ollama, either one started
 from the dashboard through the agent (section 3) or a temporary `ollama serve`.
 
-    ollama list            # confirm the exact tag, e.g. gemma4
-    # if the tag differs, set OLLAMA_MODEL in backend/.env
+    ollama pull <model>    # e.g. gemma4:e2b
+    ollama list
+
+The model used for chat is chosen in the admin **Ollama dashboard**: "Use for chat" in
+the model list, or "Model used for chat" in Settings. The choice applies from the next
+message, together with the dashboard's context length, keep-alive and Ollama host. No
+model is set in `.env`. Until an admin selects one, chat answers with "No chat model is
+selected". The selected model is shown in the chat sidebar.
 
 ## 2. Backend
 Python dependencies are managed with [uv](https://docs.astral.sh/uv/) via the

@@ -5,7 +5,8 @@ or test scripts. The `@/*` import alias maps to the `frontend/` root.
 
 ## Layout
 
-- `app/page.tsx`: the main chat UI (conversation sidebar, streaming messages, admin links).
+- `app/page.tsx`: the main chat UI (conversation sidebar, streaming messages, admin links). It shows the
+  dashboard-selected model from `/chat/model`. Never hardcode model names in the UI.
 - `app/login/page.tsx`: the sign-in form.
 - `app/admin/page.tsx`: the Ollama dashboard. It polls `/admin/ollama/status` every 5 s and logs every 3 s.
 - `app/admin/users/page.tsx`: admin user management (list, create, edit, delete).

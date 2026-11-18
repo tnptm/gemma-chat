@@ -1,7 +1,6 @@
 import re
 from pathlib import Path
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models
@@ -38,7 +37,7 @@ class OllamaConfig(models.Model):
 
     @classmethod
     def load(cls):
-        obj, _ = cls.objects.get_or_create(pk=1, defaults={"active_model": settings.OLLAMA_MODEL})
+        obj, _ = cls.objects.get_or_create(pk=1)
         return obj
 
     def keep_alive_value(self):
