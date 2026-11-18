@@ -1,6 +1,6 @@
-# Gemma chat (Django + Next.js)
+# Local Ollama AI chat (Django + Next.js)
 
-Gemma Chat is a private, local-first chat application built around a locally hosted Gemma model via Ollama. It combines a Django REST API, a Next.js chat interface, and a lightweight SQLite database to give you an end-to-end, self-hosted AI workspace without exposing your conversations or model settings to the public internet.
+Local Ollama Chat (i.e Gemma4) is a private, local-first AI chat application built around a locally hosted LLM models (now compatible with several different Ollama's [LLM models](https://ollama.com/models)) via Ollama. It combines a Django REST API, a Next.js chat interface, and a lightweight SQLite database to give you an end-to-end, self-hosted AI workspace without exposing your conversations or model settings to the public internet. It also controls running Ollama.
 
 ## Project overview
 
