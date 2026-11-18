@@ -76,6 +76,19 @@ export default function AdminPage() {
     refresh();
   }
 
+  async function selectChatModel(model: string) {
+    setBusy("Use");
+    setMsg(null);
+    const res = await request("/admin/ollama/config", { method: "PATCH", body: JSON.stringify({ active_model: model }) });
+    const j = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setDraft((d) => d && { ...d, active_model: j.active_model }); // keep other unsaved edits
+      setMsg({ ok: true, text: `Chat now uses ${j.active_model}.` });
+    } else setMsg({ ok: false, text: errText(j) });
+    setBusy("");
+    refresh();
+  }
+
   async function save(e: FormEvent) {
     e.preventDefault();
     if (!draft) return;
@@ -150,6 +163,11 @@ export default function AdminPage() {
               return (
                 <li key={m.name} className="flex flex-wrap items-center gap-3 py-2.5">
                   <span className="min-w-0 flex-1 truncate">{m.name}</span>
+                  {m.name === status.config.active_model ? (
+                    <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent">chat model</span>
+                  ) : (
+                    <button className={btn} disabled={!!busy} onClick={() => selectChatModel(m.name)}>Use for chat</button>
+                  )}
                   <span className="text-sm text-muted">{gb(m.size)}</span>
                   {l && <span className="text-sm">in memory ({gb(l.size_vram)} on GPU)</span>}
                   <button className={btn} disabled={!!busy}

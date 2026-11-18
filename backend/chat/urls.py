@@ -1,7 +1,8 @@
+from django.urls import path
 from rest_framework.routers import SimpleRouter
 
-from .views import ConversationViewSet
+from .views import ChatModelView, ConversationViewSet
 
 router = SimpleRouter(trailing_slash=False)
 router.register("conversations", ConversationViewSet, basename="conversation")
-urlpatterns = router.urls
+urlpatterns = [path("chat/model", ChatModelView.as_view())] + router.urls
