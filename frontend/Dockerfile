@@ -1,4 +1,10 @@
 FROM node:24.22.1-trixie-slim AS base
+
+# Apply current Debian security updates to the base image packages.
+RUN apt-get update \
+	&& apt-get upgrade -y \
+	&& rm -rf /var/lib/apt/lists/*
+
 # Match the locally used npm version
 RUN npm install -g npm@12.2.1 && npm cache clean --force
 WORKDIR /app
